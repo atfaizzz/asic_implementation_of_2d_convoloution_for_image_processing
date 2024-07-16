@@ -1,0 +1,64 @@
+`timescale 1ns / 1ps
+
+module tb_Convolutor6;
+
+    reg clk;
+    reg rst;
+    reg [16*400-1:0] i_dato; // 20x20 input flattened to 1D vector (16-bit)
+    reg i_selecK_I;
+    reg i_valid;
+    wire [16*324-1:0] o_data; // 18x18 output flattened to 1D vector (16-bit)
+
+    Convolutor6 uut (
+        .o_data(o_data),
+        .i_dato(i_dato),
+        .i_selecK_I(i_selecK_I),
+        .i_reset(rst),
+        .i_valid(i_valid),
+        .i_CLK(clk)
+    );
+
+    integer i,j;
+    reg [15:0] input_matrix [0:399]; // 20x20 input matrix (16-bit)
+
+    initial begin
+        // Initialize clock
+        clk = 0;
+        forever #5 clk = ~clk;
+    end
+
+    initial begin
+        // Initialize reset
+        rst = 1;
+        #10;
+        rst = 0;
+    
+
+        // Initialize input matrix from file
+        $readmemb("E:/CLG/cnvd/binary_numbers.txt", input_matrix);
+
+        // Pack the input matrix into the vector
+        for (i = 0; i < 400; i = i + 1) begin
+            i_dato[16*i +: 16] = input_matrix[i];
+        end
+
+        i_selecK_I = 1; // Mode to load image data
+        i_valid = 1;
+
+        // Wait for some time to see the output
+        #20;
+
+        // Display the output
+        $display("Convolution Output:");
+        for (i = 0; i < 18; i = i + 1) begin
+        
+            for (j = 0; j < 18; j = j + 1) begin
+                $write("%d ", $signed(o_data[16*((i*18) + j) +: 16]));
+            end
+            $display();
+        end
+
+        // End the simulation
+        $stop;
+    end
+endmodule

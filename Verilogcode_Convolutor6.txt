@@ -1,0 +1,72 @@
+`timescale 1ns / 1ps
+
+module Convolutor6 (
+    output [16*324-1:0] o_data, // 18x18 output flattened to 1D vector
+    input [16*400-1:0] i_dato,   // 20x20 input flattened to 1D vector
+    input i_selecK_I, // KI=0 for kernel mode, KI=1 for image mode
+    input i_reset,
+    input i_valid,
+    input i_CLK
+);
+    // Kernel for horizontal edge detection
+    reg signed [7:0] kernel [0:8]; 
+    reg signed [15:0] image [0:399]; // 20x20 image
+    reg signed [15:0] conv_out [0:323]; // 18x18 output feature map
+
+    integer i, j, m, n, ii, jj;
+    integer kCenterX, kCenterY, mm, nn;
+
+    // Initialize the kernel values
+    initial begin
+        kernel[0] = -8'd1; kernel[1] = -8'd2; kernel[2] = -8'd1;
+        kernel[3] =  8'd0; kernel[4] =  8'd0; kernel[5] =  8'd0;
+        kernel[6] =  8'd1; kernel[7] =  8'd2; kernel[8] =  8'd1;
+    end
+
+    // Output assignment
+    generate
+        genvar idx;
+        for (idx = 0; idx < 324; idx = idx + 1) begin : gen_out
+            assign o_data[16*idx +: 16] = conv_out[idx];
+        end
+    endgenerate
+
+    always @(posedge i_CLK or posedge i_reset) begin
+        if (i_reset) begin
+            for (i = 0; i < 324; i = i + 1) begin
+                conv_out[i] <= 16'b0;
+            end
+        end else if (i_valid) begin
+            if (i_selecK_I) begin
+                // Load image data
+                for (i = 0; i < 400; i = i + 1) begin
+                    image[i] <= i_dato[16*i +: 16];
+                end
+
+                // Perform convolution
+                kCenterX = 1; // Center of 3x3 kernel
+                kCenterY = 1;
+
+                for (i = 1; i < 19; i = i + 1) begin
+                    for (j = 1; j < 19; j = j + 1) begin
+                        conv_out[(i-1)*18 + (j-1)] = 0;
+                        for (m = 0; m < 3; m = m + 1) begin
+                            mm = 2 - m; // row index of flipped kernel
+                            for (n = 0; n < 3; n = n + 1) begin
+                                nn = 2 - n; // column index of flipped kernel
+                                // index of input signal, used for checking boundary
+                                ii = i + (kCenterY - mm);
+                                jj = j + (kCenterX - nn);
+
+                                // ignore input samples which are out of bound
+                                if (ii >= 0 && ii < 20 && jj >= 0 && jj < 20)
+                                    conv_out[(i-1)*18 + (j-1)] = conv_out[(i-1)*18 + (j-1)] + 
+                                                         $signed(image[ii*20 + jj]) * $signed(kernel[mm*3 + nn]);
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+endmodule
